@@ -7,6 +7,26 @@ A systematic walkthrough for hardening your OpenClaw agent's behavior on macOS. 
 
 ---
 
+## ⚡ Quick Start — The Easy Button
+
+**Just paste this into your OpenClaw chat:**
+
+```
+Read the security hardening guide at https://github.com/rbfp/openclaw-security-guide and work through it with me one category at a time. For each category:
+1. Explain the risks in plain language
+2. Present my options and tradeoffs
+3. Wait for my decision before moving on
+4. Write the agreed rules into my AGENTS.md
+
+Don't rush ahead. One category at a time, starting with Category 1.
+```
+
+Your agent will fetch the guide, explain each section, help you make decisions, and write the rules directly into your config. You stay in control at every step.
+
+> **Note:** Your agent's behavior after hardening will depend on the choices *you* make — this guide doesn't impose a specific configuration. Every setup is different.
+
+---
+
 ## Why This Matters
 
 Your OpenClaw agent can:
