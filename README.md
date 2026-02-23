@@ -268,6 +268,12 @@ Required format: "Tier 2 — GitHub: I'm about to run `[exact command]`. This wi
 ```
 Consider similar rules for: terraform apply, aws writes, sending emails, publishing PRs.
 
+**Important: Authorization does not carry forward.**
+A "go" for one push does not authorize the next push in the same session. Each push needs its own pre-flight — even if you're in an active work session and things are flowing. This is especially important because:
+- Sessions can accumulate many small pushes
+- A direct request like "update the GitHub" still requires the agent to state the exact command before running it
+- **The agent must not bundle unrequested changes into a commit.** If you ask to push a specific change and the agent decides to also add a rename, a doc update, or anything else you didn't ask for — that's a separate action requiring its own confirmation. What goes into the commit must match what you asked for, no more.
+
 ### Dynamic Commands
 - Sanitize shell metacharacters: [yes/no]
 - Show constructed command before running: [yes/no]
