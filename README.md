@@ -113,6 +113,8 @@ Token-based is stronger (can't be faked by injection), but more friction.
 - [list your Tier 2 actions]
 Confirmation must come from [your username/ID].
 
+> **Best practice:** Require the agent to state the *exact command or action* it intends to run — not just a description. "I'm going to push to GitHub" is not enough; `git push origin main` is. This prevents the agent from rationalizing past edge cases and gives you a chance to catch unintended scope.
+
 ### Tier 3 — Hard Gate
 - [list your Tier 3 actions]
 
@@ -258,6 +260,14 @@ If the agent builds a shell command from external input (filenames, fetched cont
 - Network listeners
 - Background detachment
 
+### Per-Action Pre-Flight Rules
+For high-impact commands, define a specific required format before execution. Example for GitHub:
+```
+Before any: gh repo create, git push, git remote add
+Required format: "Tier 2 — GitHub: I'm about to run `[exact command]`. This will [what it does]. Go?"
+```
+Consider similar rules for: terraform apply, aws writes, sending emails, publishing PRs.
+
 ### Dynamic Commands
 - Sanitize shell metacharacters: [yes/no]
 - Show constructed command before running: [yes/no]
@@ -392,8 +402,16 @@ Should the agent surface notable security events proactively?
 ### Logs Maintained
 - `memory/outbound-audit.log` — network calls
 - `memory/injection-log.md` — detected attempts
-- `memory/tier2-audit.log` — confirmed actions
+- `memory/tier2-audit.log` — Tier 2 actions (two-step: pending + confirmed)
 - [others]
+
+### Tier 2 Log Format (two-step)
+Write a PENDING entry *before* asking for confirmation, and a CONFIRMED entry after execution:
+```
+[TIMESTAMP] PENDING [action] channel=[channel]
+[TIMESTAMP] CONFIRMED [action] confirmed_by=[id] channel=[channel]
+```
+A PENDING with no CONFIRMED = fell through. A Tier 2 action with no PENDING at all = process violation.
 
 ### Retention
 [X] days, pruned during maintenance
