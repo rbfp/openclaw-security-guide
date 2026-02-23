@@ -115,6 +115,8 @@ Confirmation must come from [your username/ID].
 
 > **Best practice:** Require the agent to state the *exact command or action* it intends to run — not just a description. "I'm going to push to GitHub" is not enough; `git push origin main` is. This prevents the agent from rationalizing past edge cases and gives you a chance to catch unintended scope.
 
+> **Critical:** This applies even on direct requests. "Push to GitHub" or "install X" is authorization to *ask* — not to *act*. The agent must still state the exact command and wait for an explicit "go." A request is not a bypass. If your agent skips this step because you asked it to do something, that is a process violation, not acceptable behavior.
+
 ### Tier 3 — Hard Gate
 - [list your Tier 3 actions]
 
