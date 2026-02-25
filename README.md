@@ -167,6 +167,79 @@ What can your agent read and write?
 
 ---
 
+## Prod File Change Management
+
+Config and system files sit outside normal Tier 1/2 territory — the risk isn't just "did I authorize this?" it's "what if the change breaks something and the agent itself goes down?"
+
+Two-tier approach:
+
+### Tier A — Scripted Rollback (high-value files)
+
+Identify your most critical config files. Write a dedicated script that:
+1. Backs up the file before any change
+2. Restarts the relevant service
+3. Polls health post-restart
+4. Automatically restores the backup on failure — without requiring the agent to be running
+
+Reserve this tier for files where failure is non-interactive and costly. For OpenClaw specifically, `~/.openclaw/openclaw.json` is the obvious candidate.
+
+### Tier B — Dead Man's Switch (everything else)
+
+For any other config or system file outside your workspace:
+
+1. Back up: `cp "$TARGET" "$TARGET.ocsnap"`
+2. Spawn a 2-minute auto-revert:
+   ```bash
+   nohup bash -c "sleep 120 && cp '$TARGET.ocsnap' '$TARGET'" & echo $! > /tmp/tier-b-revert.pid
+   ```
+3. Make the change
+4. Ask your human: *"Change applied — 2 min on the clock. Did it work? Confirm to cancel the revert."*
+5. **On confirm:** kill the revert process, delete `.ocsnap`, log CONFIRMED
+6. **On timeout/no response:** revert fires automatically, even if the agent is down
+
+The key property of Tier B: the revert process is independent of the agent. If a change breaks OpenClaw itself, the revert still fires.
+
+### Decision Points
+
+**Question 1:** Which files need Tier A? (scripted backup + auto-rollback)
+- Gateway/daemon config?
+- Auth configs?
+- Shell init files?
+
+**Question 2:** What backup extension will you use?
+Choose something your tooling won't accidentally treat as a live config. Avoid `.bak` if your tools use it. `.ocsnap` works well for OpenClaw-managed backups — it's meaningless to everything else.
+
+**Question 3:** How long is 2 minutes for your use case?
+Some changes need a few minutes to settle. 2 minutes is a reasonable default; your Tier B procedure can allow a longer window when declared before making the change.
+
+**Question 4:** What if there's already a backup file?
+An existing `.ocsnap` means a prior run may have failed without reverting. Treat it as a hard stop — don't silently overwrite. Alert and let your human decide before proceeding.
+
+### Template
+
+```markdown
+## Prod File Change Management
+
+### Tier A — Scripted (automated rollback)
+Files: [e.g., ~/.openclaw/openclaw.json]
+Script: [path to rollback script]
+Behavior: backs up → restarts service → health-polls → auto-reverts on failure
+
+### Tier B — Dead Man's Switch (all other prod/system files outside workspace)
+Before any change:
+1. cp "$TARGET" "$TARGET.ocsnap"
+2. nohup bash -c "sleep 120 && cp '$TARGET.ocsnap' '$TARGET'" & echo $! > /tmp/tier-b-revert.pid
+3. Make the change
+4. Ask: "Did it work? Confirm to cancel the revert (2 min on the clock)."
+5. On confirm: kill $(cat /tmp/tier-b-revert.pid) && rm "$TARGET.ocsnap" — log CONFIRMED
+6. On timeout/no response: revert fires automatically
+
+Backup extension: .ocsnap
+Revert window: 2 minutes (declare longer if needed before making the change)
+```
+
+---
+
 ## Category 3: Network & Outbound
 
 Control what leaves your machine.
@@ -529,6 +602,7 @@ Work through these in order:
 
 - [ ] **Category 1:** Define your three tiers
 - [ ] **Category 2:** Map your filesystem — free, protected, off-limits
+- [ ] **Prod File Change Management:** Identify Tier A files, write rollback script, document Tier B procedure
 - [ ] **Category 3:** Set outbound policies and create audit log
 - [ ] **Category 4:** Define command denylist and confirmation patterns
 - [ ] **Category 5:** Identify credential locations and set handling rules
