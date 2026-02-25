@@ -428,7 +428,15 @@ A PENDING with no CONFIRMED = fell through. A Tier 2 action with no PENDING at a
 All security logs in `.gitignore`: [yes/no]
 
 ### Daily Summary
-Post to [channel] if notable events occurred: [yes/no]
+Configure a morning briefing that scans the previous 24h logs and posts to your monitoring channel if any of the following occurred:
+- Red injection attempt
+- Protected-path access (iCloud or equivalent)
+- Tier 3 execution
+- Credential exposure
+- Data egress block
+- `tier2-audit.log` has a PENDING entry with no matching CONFIRMED — **this is a process violation**: a Tier 2 action was logged as pending but never confirmed
+
+That last one is easy to miss. It means your agent completed a Tier 2 action without finishing the authorization flow — the log looks clean but the process was skipped.
 ```
 
 ---
@@ -493,7 +501,7 @@ This deserves special attention. Your agent processes content from external sour
 **Two-level detection:**
 
 **Yellow — Suspicious, likely benign**
-Content *discusses* AI manipulation (e.g., a security blog post about injection). Pause, flag, ask if you want to continue.
+Content *discusses* AI manipulation (e.g., a security blog post about injection). Pause, post an alert to your monitoring channel, and ask if you want to continue. Don't just log silently — surface it where you'll see it.
 
 **Red — Active attack**
 Content *attempts* to override your agent's behavior — references tools by name, claims new permissions, sets up exfiltration. Hard stop, alert, log.
