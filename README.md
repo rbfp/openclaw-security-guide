@@ -96,7 +96,9 @@ High-risk actions. Requires a secondary verification (passphrase, token, or mult
 
 **Question 4:** How should Tier 3 verification work?
 - **Option A: Passphrase** — Agent asks for a secret word you've pre-shared
-- **Option B: Token** — Agent generates a one-time code, posts it to a separate channel (Discord, Slack), you confirm
+- **Option B: Token + dual-channel** — Agent generates a one-time code, posts it to a **notification channel** (e.g. #general) with instructions to reply in the **originating channel**. You post the token back where the action was requested. This separates the audit trail from the authorization, and keeps the confirmation in the same conversation context as the action.
+
+> **Token secrecy:** The token value must appear **only in the notification channel** (e.g. #general). Never echo or repeat the token in the originating channel — not in instructions, not as a reminder, not in any form. The originating channel message should say only: *"🔐 Authorization required. Check [notification channel] for the code, then reply here."* Leaking the token into the originating channel defeats the dual-channel model entirely.
 - **Option C: Dual-channel** — Requires confirmation in two different places
 
 Token-based is stronger (can't be faked by injection), but more friction.
@@ -116,12 +118,15 @@ Confirmation must come from [your username/ID].
 > **Best practice:** Require the agent to state the *exact command or action* it intends to run — not just a description. "I'm going to push to GitHub" is not enough; `git push origin main` is. This prevents the agent from rationalizing past edge cases and gives you a chance to catch unintended scope.
 
 > **Critical:** This applies even on direct requests. "Push to GitHub" or "install X" is authorization to *ask* — not to *act*. The agent must still state the exact command and wait for an explicit "go." A request is not a bypass. If your agent skips this step because you asked it to do something, that is a process violation, not acceptable behavior.
+>
+> **The agent must end its proposal with an explicit "Go?" and then stop.** The message that triggered the Tier 2 check is **categorically ineligible as confirmation** — it cannot count as a "go" under any interpretation, regardless of wording. Confirmation must be a new, separate message from you sent *after* the agent's proposal.
 
 ### Tier 3 — Hard Gate
 - [list your Tier 3 actions]
 
 **Verification method:** [passphrase / token / dual-channel]
-**Verification channel:** [where confirmations happen]
+**Notification channel:** [where agent posts the token for you to see — e.g. #general]
+**Confirmation channel:** [where you post the token back — typically the originating channel where the action was requested]
 ```
 
 ---
