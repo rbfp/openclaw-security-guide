@@ -58,6 +58,93 @@ Before hardening, understand what you're protecting against:
 
 ---
 
+## Two-Layer Security Model
+
+This guide focuses on **agent-enforced** guardrails — rules your agent follows because you wrote them into its behavioral config (AGENTS.md). But OpenClaw also has **platform-enforced** security: native exec approvals that gate shell commands at the infrastructure level.
+
+Neither layer is sufficient alone. Together, they cover each other's gaps.
+
+### What OpenClaw's Native Exec Approvals Do
+
+OpenClaw can require your approval before any shell command runs. When a command isn't on the allowlist, you see a prompt with the exact binary and arguments, and can:
+- **`allow-once`** — run this time only
+- **`allow-always`** — add the resolved binary path to the permanent allowlist
+- **`deny`** — block it
+
+Key properties:
+- **Per-agent allowlists** — Each agent gets its own binary allowlist. One agent's approvals don't leak to another.
+- **Channel-targeted prompts** — Approval prompts appear where the agent is working, not in DMs. You approve in context.
+- **Fail-closed** — If you're not around to approve, commands don't run. An unattended agent can't execute arbitrary commands.
+
+### What AGENTS.md Covers That Exec Approvals Can't
+
+Exec approvals show you *what binary and arguments* the agent wants to run. They don't tell you *why*, and they don't cover non-exec actions at all.
+
+Your AGENTS.md guardrails fill these gaps:
+
+- **Semantic intent review** — Exec approvals show `curl -X POST ...`; your tier system asks "why are you sending data outbound?"
+- **Data egress rules** — Detecting whether `curl` is uploading sensitive data vs. fetching a webpage
+- **Protected filesystem paths** — Token-gated access to sensitive directories (iCloud, credential stores)
+- **Credential handling** — Never writing secrets to logs, memory, or messages
+- **Prompt injection defense** — Detecting and quarantining malicious instructions in fetched content
+- **Non-exec actions** — Channel deletes, cron modifications, email sends, and calendar edits aren't shell commands — exec approvals don't apply. Your tier system is the only gate.
+
+### How the Layers Work Together
+
+| Action Type | Agent Layer (AGENTS.md) | Platform Layer (Exec Approvals) |
+|---|---|---|
+| Read-only / workspace files | Tier 1 — just do it | No exec involved |
+| Shell command (allowlisted binary) | Tier 1 | Auto-approved — runs silently |
+| Shell command (new binary) | Tier 2 — agent explains intent | Exec approval prompt in-channel |
+| Destructive exec (force push, terraform, rm) | Tier 3 — token flow | Exec approval prompt (double gate) |
+| Non-exec action (channel delete, cron, email) | Tier 2 or 3 — your tier rules | Not applicable (tool calls, not exec) |
+
+The ideal: even if the agent hallucinates past a Tier 2 check, the exec approval still catches the command. And even if you `allow-always` a binary, the agent's tier system still requires intent disclosure before using it destructively.
+
+### Exec Approval Configuration Reference
+
+Set these in `openclaw.json` under `"tools"`:
+
+| Key | Values | Recommended | What It Does |
+|-----|--------|-------------|--------------|
+| `tools.exec.security` | `"deny"` \| `"allowlist"` \| `"full"` | `"allowlist"` | Controls which binaries can run. `allowlist` = only pre-approved run freely. `full` = no gate. `deny` = all blocked. |
+| `tools.exec.ask` | `"off"` \| `"on-miss"` \| `"always"` | `"on-miss"` | What happens when a command isn't on the allowlist. `on-miss` = prompt you. `always` = prompt for everything. `off` = auto-deny unlisted. |
+| `tools.exec.strictInlineEval` | `true` \| `false` | `true` | Gates `python -c`, `node -e`, `osascript -e`, etc. Even if the interpreter is allowlisted, inline eval still needs approval. Prevents code injection through eval. |
+| `tools.elevated.enabled` | `true` \| `false` | `true` | Enables elevated (privileged) command execution. |
+| `tools.elevated.allowFrom.discord` | `["user-id"]` | Your Discord user ID only | Restricts who can authorize elevated commands from Discord. |
+
+**Example `openclaw.json` snippet:**
+```json
+{
+  "tools": {
+    "exec": {
+      "security": "allowlist",
+      "ask": "on-miss",
+      "strictInlineEval": true
+    },
+    "elevated": {
+      "enabled": true,
+      "allowFrom": {
+        "discord": ["YOUR_DISCORD_USER_ID"]
+      }
+    }
+  }
+}
+```
+
+**Approval flow in practice:**
+
+When the agent runs a command that isn't on the allowlist, you'll see a prompt in your Discord channel:
+```
+Approval required (id abc123).
+Command: git push origin main
+Reply with: /approve abc123 allow-once|allow-always|deny
+```
+
+The allowlist grows organically through your `allow-always` approvals. Start conservative — you'll build up a tailored set of trusted commands quickly.
+
+---
+
 ## Category 1: Behavioral — Confirmation Tiers
 
 The foundation. Define what your agent can do freely vs. what requires your approval.
@@ -357,6 +444,9 @@ A "go" for one push does not authorize the next push in the same session. Each p
 ### Dynamic Commands
 - Sanitize shell metacharacters: [yes/no]
 - Show constructed command before running: [yes/no]
+
+### Platform Enforcement (Exec Approvals)
+If you've configured OpenClaw's native exec approvals (see "Two-Layer Security Model" above), they act as a second gate underneath your AGENTS.md rules. Even if the agent bypasses its own tier check, the exec approval still catches the command. Configure `tools.exec.security: "allowlist"` and `tools.exec.ask: "on-miss"` for the strongest coverage.
 ```
 
 ---
@@ -605,6 +695,7 @@ Recommend: A keyword (like `sudo`) that only works when verified as coming from 
 
 Work through these in order:
 
+- [ ] **Exec Approvals:** Configure `tools.exec` in `openclaw.json` (see "Two-Layer Security Model")
 - [ ] **Category 1:** Define your three tiers
 - [ ] **Category 2:** Map your filesystem — free, protected, off-limits
 - [ ] **Prod File Change Management:** Identify Tier A files, write rollback script, document Tier B procedure
